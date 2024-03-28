@@ -341,9 +341,9 @@ class MastermindCV:
         cv2.destroyAllWindows()
 
 
-def main(argv):
+def main():
     cv_game = MastermindCV()
     cv_game.run()
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
