@@ -1,0 +1,9 @@
+.idea
+AnumbyMasterMind.egg-info
+build
+dist
+include
+Lib
+Scripts
+tar
+twine
