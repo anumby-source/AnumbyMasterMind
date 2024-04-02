@@ -5,6 +5,7 @@ import numpy as np
 import easyocr
 import requests
 import time
+import socket
 
 N = 6
 P = 3
@@ -12,6 +13,10 @@ P = 3
 internal_mode = 0
 robot_mode = 1
 mode_camera = internal_mode
+
+# camera
+image_w  = 96   # largeur image camera
+image_h  = 96   # hauteur image camera
 
 
 class OCR:
@@ -26,29 +31,46 @@ class OCR:
             self.width = 640
             self.height = 480
         else:
-            self.width = 640
-            self.height = 480
+            #  initialisation socket udp
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.addr_port = ('192.168.4.1', 10086)  # ESP32-CAM address
+            self.s.settimeout(1)
+            self.color = b'BLACK'
+            self.width = image_w
+            self.height = image_h
 
     def shape(self):
         return self.height, self.width
 
     def internal_camera(self):
         cap = cv2.VideoCapture(0)
-        ret, frame = cap.read()
-        return frame
+        ret, raw_image = cap.read()
+        return raw_image
 
     def esp32cam(self):
+        try:
+            self.s.sendto(self.color, self.addr_port)
+            buf = self.s.recvfrom(50000)
+            raw_img = np.asarray(bytearray(buf[0]), dtype=np.uint8)
+            return raw_img
+        except:          # timeout de réception de l'image
+            print('no image ', self.count)
+            self.count += 1
+            return None
+
+        """
         r = requests.get("http://192.168.4.1:80/capture")
         image = np.asarray(bytearray(r.content), dtype=np.uint8)
         return cv2.imdecode(image, cv2.IMREAD_COLOR)
+        """
 
     def read(self):
         if mode_camera == internal_mode:
             frame = self.internal_camera()
         else:
             frame = self.esp32cam()
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         return self.reader.readtext(frame), frame
 
 
