@@ -27,6 +27,7 @@ class OCR:
 
     def __init__(self):
         self.reader = easyocr.Reader(['fr'])  # Utiliser EasyOCR avec la langue anglaise
+        self.count = 0
         if mode_camera == internal_mode:
             self.width = 640
             self.height = 480
@@ -54,7 +55,7 @@ class OCR:
             raw_img = np.asarray(bytearray(buf[0]), dtype=np.uint8)
             return raw_img
         except:          # timeout de réception de l'image
-            print('no image ', self.count)
+            # print('no image ', self.count)
             self.count += 1
             return None
 
@@ -69,9 +70,13 @@ class OCR:
             frame = self.internal_camera()
         else:
             frame = self.esp32cam()
+            # print("OCR::read>", frame)
 
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        return self.reader.readtext(frame), frame
+        if not frame is None:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            return self.reader.readtext(frame), frame
+        else:
+            return None, None
 
 
 class Jeu:
@@ -295,19 +300,23 @@ class MastermindCV:
         else:
             jeu.info = f"choisis un chiffre"
 
-        for (bbox, text, prob) in result:
-            if prob > 0.5 and contains_integer(text):
-                t = int(text)
-                if t > 0 and t <= N:
-                    # print("t=", t, "position=", jeu.position, "jeu=", jeu)
-                    if jeu.position >= 0:
-                        if self.valid(t):
-                            jeu.jeu[jeu.position] = t
-                            # print("process_frame. position=", self.position, "jeu=", jeu)
-                            jeu.info = f"chiffre {t} choisi"
-                        else:
-                            jeu.info = f"doublons interdits ({t})"
-                    self.draw_ihm(jeu.position)
+        if result is None:
+            jeu.info = f"pas d'image"
+            self.draw_ihm(jeu.position)
+        else:
+            for (bbox, text, prob) in result:
+                if prob > 0.5 and contains_integer(text):
+                    t = int(text)
+                    if t > 0 and t <= N:
+                        # print("t=", t, "position=", jeu.position, "jeu=", jeu)
+                        if jeu.position >= 0:
+                            if self.valid(t):
+                                jeu.jeu[jeu.position] = t
+                                # print("process_frame. position=", self.position, "jeu=", jeu)
+                                jeu.info = f"chiffre {t} choisi"
+                            else:
+                                jeu.info = f"doublons interdits ({t})"
+                        self.draw_ihm(jeu.position)
 
                     break
 
