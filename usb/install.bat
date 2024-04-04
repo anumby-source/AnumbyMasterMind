@@ -10,4 +10,4 @@ rem installation des dépendances
 py -m pip install --no-index --find-links=deps -r requirements.txt
 
 rem utilisation de l'application
-py AnumbyMasterMind\__main__.py
+py AnumbyMasterMind.py
