@@ -34,21 +34,24 @@ ou
 
 ## Installation à partir d'une clé USB
 
-- on part de la version de python python-3.12.2-amd64.exe
-    - que l'on installe dans un espace dédié (HERE)
+- on part de la version de python ``python-3.12.2-amd64.exe``
+    - que l'on installe dans un espace dédié (``HERE``)
 - on crée un kit pip contenant toutes les librairies nécessaires
     - dans HERE, on utilise la version de python sélectionnée
-    - avec la commande "py -m pip download -r requirements.txt -d deps" on crée deps avec toutes les librairies décrite dans requirements.txt
-- dans HERE, on installe ces librairies avec la commande:
-    - avec la commande "py -m pip install --no-index --find-links=deps -r requirements.txt"
+    - avec la commande
+       - ``py -m pip download -r requirements.txt -d deps``
+    - on crée deps avec toutes les librairies décrite dans requirements.txt
+- dans HERE, on installe ces librairies:
+    - avec la commande
+       - ``py -m pip install --no-index --find-links=deps -r requirements.txt``
 - ainsi on peu lancer l'application:
-    - "py AnumbyMasterMind\__main__.py"
+    - ``py AnumbyMasterMind.py``
 
 Pour créer la clé USB on rassemble:
-- le kit d'installation python "python-3.12.2-amd64.exe"
-- l'ensemble des librairies nécessaires dans le dossier "reps" créé précédemment
-- l'application AnumbyMasterMind\__main__.py -> AnumbyMasterMind.py
-- le script d'installation usb/install.bat
+- le kit d'installation python ``python-3.12.2-amd64.exe``
+- l'ensemble des librairies nécessaires dans le dossier ``reps`` créé précédemment
+- l'application ``AnumbyMasterMind/__main__.py`` -> ``AnumbyMasterMind.py``
+- le script d'installation ``usb/install.bat``
 
 ## Déinstallation
 
