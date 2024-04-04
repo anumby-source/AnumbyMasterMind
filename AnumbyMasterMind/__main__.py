@@ -54,7 +54,8 @@ class OCR:
             buf = self.s.recvfrom(50000)
             raw_img = np.asarray(bytearray(buf[0]), dtype=np.uint8)
             return raw_img
-        except:          # timeout de réception de l'image
+        except:
+            # timeout de réception de l'image
             # print('no image ', self.count)
             self.count += 1
             return None
