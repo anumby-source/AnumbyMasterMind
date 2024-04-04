@@ -56,6 +56,9 @@ Pour créer la clé USB on rassemble:
 - l'application ``AnumbyMasterMind/__main__.py`` -> ``AnumbyMasterMind.py``
 - le script d'installation ``usb/install.bat``
 
+set HERE=d:\workspace\testmastermind\
+set PATH=%HERE%\python\Scripts\;%HERE%\python\;%PATH%
+
 ## Déinstallation
 
 ``pip uninstall -y AnumbyMasterMind``
