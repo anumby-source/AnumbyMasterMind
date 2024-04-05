@@ -205,7 +205,7 @@ class MastermindCV:
 
         r = False
         if exact == P:
-            jeu.info = f"Bravo c'est gagné!!!"
+            jeu.info = f"Bravo c'est gagne!!!"
             r = True
         else:
             jeu.info = f"OK={exact} on={exists} off={off}"
