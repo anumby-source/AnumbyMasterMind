@@ -113,18 +113,22 @@ class MastermindCV:
         self.valeurs = [i for i in range(1, N + 1)]
         self.info_start = "Choisis une position"
 
+        self.proba = 0
+        self.chiffre = 0
+
         #-------------------------------------------------
 
         self.padding = 10
 
         self.help_lines = [
-          "ABC... : position",
-          "Enter : selection",
-          "",
-          "I : camera interne",
-          "R : camera robot",
-          "N : nouveau jeu",
-          "Q : quit",
+            "ABC... : position",
+            "Enter : selection",
+            "X : solution",
+            "",
+            "I : camera interne",
+            "R : camera robot",
+            "N : nouveau jeu",
+            "Q : quit",
         ]
 
         self.help_width = 180
@@ -134,6 +138,7 @@ class MastermindCV:
         self.position_height = 50
 
         # zone d'information
+        self.info_width = 370
         self.info_height = int(self.position_height * 0.5)
 
         if mode_camera == internal_mode:
@@ -143,6 +148,8 @@ class MastermindCV:
 
         # chaque ligne de jeu
         self.ligne_height = self.position_height + self.padding + self.info_height + self.padding
+
+        self.frame_position = 0
 
         # -------------------------------------------------
 
@@ -212,12 +219,17 @@ class MastermindCV:
         lignes_width = p_min * (self.position_width + self.padding)
         lignes_height = self.lignes * self.ligne_height
 
+        if self.info_width > lignes_width:
+            lignes_width = self.info_width
+
         # taille avec la zone d'aide
         help_lignes_width = self.padding + self.help_width + self.padding + lignes_width
         help_lignes_height = self.help_height
         if lignes_height > self.help_height:
             help_lignes_height = lignes_height
         help_lignes_height += self.padding
+
+        self.frame_position = help_lignes_width
 
         # taille totale
         full_width = help_lignes_width + self.ocr.width + self.padding
@@ -246,7 +258,7 @@ class MastermindCV:
             y += 20
 
     def draw_lignes(self, current_position):
-        # l'image complète de l'IHM
+        print("draw_lignes. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
         p_min = P
         if P < 4:
             p_min = 4
@@ -267,7 +279,7 @@ class MastermindCV:
                 if ligne == (self.lignes - 1):
                     jeu.set_time()
                     if position == current_position:
-                        color_foposition_widthnd = red
+                        color_fond = red
                         color_char = white
 
                 # print("draw_ihm. i=", i, x1, y1, x2, y2)
@@ -300,7 +312,7 @@ class MastermindCV:
             x1 = self.help_width + self.padding
             y1 = y + self.position_height + self.padding
 
-            x2 = x1 + p_min * (self.position_width + self.padding) - self.padding
+            x2 = x1 + self.info_width - self.padding
             y2 = y1 + self.info_height
             c = white
 
@@ -326,10 +338,22 @@ class MastermindCV:
 
         if self.frame is not None:
             # print(self.frame.shape)
-            x1 = self.help_width + self.padding + p_min * (self.position_width + self.padding)
+            x1 = self.frame_position
             y1 = self.padding
 
             self.image[y1:y1 + self.ocr.height, x1:x1 + self.ocr.width] = self.frame
+
+            text = "p({})={:5.2f}".format(str(self.chiffre), self.proba)
+
+            cv2.putText(self.image,
+                        text=text,
+                        org=(x1 + 10, y1 + 18),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.6,
+                        color=red,
+                        thickness=1,
+                        lineType=cv2.LINE_AA)
+
 
     # Fonction pour dessiner l'IHM
     def draw_ihm(self, current_position=-1):
@@ -361,13 +385,13 @@ class MastermindCV:
         if jeu.position >= 0:
             for p in range(P):
                 k = jeu.jeu[p]
-                print("valid> p=", p, "k=", k, "pos=", jeu.position, "essai=", essai)
+                # print("valid> p=", p, "k=", k, "pos=", jeu.position, "essai=", essai)
                 if p != jeu.position:
                     if essai == k:
-                        print("valid> False")
+                        # print("valid> False")
                         return False
 
-        print("valid> True")
+        # print("valid> True")
         return True
 
     def process_frame(self):
@@ -386,12 +410,13 @@ class MastermindCV:
         if jeu.position == -1:
             jeu.info = f"choisis une position"
         else:
-            jeu.info = f"choisis un chiffre"
+            jeu.info = f"choisis un chiffre (1..{N})"
 
         if result is None:
             jeu.info = f"pas d'image"
             self.draw_ihm(jeu.position)
         else:
+            condition = ""
             for (bbox, text, prob) in result:
                 if prob > 0.5 and contains_integer(text):
                     t = int(text)
@@ -404,6 +429,8 @@ class MastermindCV:
                                 jeu.info = f"chiffre {t} choisi"
                             else:
                                 jeu.info = f"doublons interdits ({t})"
+                        self.proba = prob
+                        self.chiffre = t
                         self.draw_ihm(jeu.position)
 
                     break
@@ -441,6 +468,8 @@ class MastermindCV:
                 mode_camera = robot_mode
             elif k == ord('n') or k == ord('N'):
                 self.restart()
+            elif k == ord('X') or k == ord('x'):
+                print(self.secret)
             elif k == 13:
                 # enter => valider une combinaison
                 zone = 4
@@ -449,8 +478,8 @@ class MastermindCV:
 
             if zone >= 0 and zone <= P:
                 # print("zone=", zone)
-                self.draw_ihm(zone)
                 jeu.position = zone
+                self.draw_ihm(zone)
             elif zone == 4:
                 # on teste la combinaison
                 ok = self.result()
