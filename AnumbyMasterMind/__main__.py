@@ -251,9 +251,16 @@ class MastermindCV:
         y1 = self.padding
         cv2.rectangle(self.image, (x1, y1), (x1 + self.full_width - 2*self.padding, y1 + self.title_height), yellow, -1)
 
+        (width, height), baseline = cv2.getTextSize(self.title,
+                                                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                                    fontScale=1.4,
+                                                    thickness=2)
+
+        # print(f"draw_title> {width} {height} {baseline}")
+
         cv2.putText(self.image,
                     text=self.title,
-                    org=(x1 + int(self.full_width/2) - 300, y1 + int(self.title_height/2) + 15),
+                    org=(x1 + int(self.full_width/2 - width/2), y1 + int(self.title_height/2 + height/2)),
                     fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                     fontScale=1.4,
                     color=red,
