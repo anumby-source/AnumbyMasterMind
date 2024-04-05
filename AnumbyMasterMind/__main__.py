@@ -152,12 +152,9 @@ class MastermindCV:
         self.frame_position = 0
 
         self.title_width = 300
-        self.title_height = 80
+        self.title_height = 40
 
-        self.title =  [
-            'ANUMBY',
-            'MasterMind'
-        ]
+        self.title =  'ANUMBY - MasterMind'
 
         # -------------------------------------------------
 
@@ -253,6 +250,15 @@ class MastermindCV:
         x1 = self.padding
         y1 = self.padding
         cv2.rectangle(self.image, (x1, y1), (x1 + self.full_width - 2*self.padding, y1 + self.title_height), yellow, -1)
+
+        cv2.putText(self.image,
+                    text=self.title,
+                    org=(x1 + int(self.full_width/2) - 300, y1 + int(self.title_height/2) + 15),
+                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                    fontScale=1.4,
+                    color=red,
+                    thickness=2,
+                    lineType=cv2.LINE_AA)
 
     def draw_help(self):
         x1 = self.padding
