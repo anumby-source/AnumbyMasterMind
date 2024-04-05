@@ -107,7 +107,7 @@ class MastermindCV:
         self.frame = None
 
         # Créer une fenêtre OpenCV
-        cv2.namedWindow('MasterMind')
+        cv2.namedWindow('ANUMBY - MasterMind')
 
         # Définir les valeurs possibles
         self.valeurs = [i for i in range(1, N + 1)]
@@ -150,6 +150,14 @@ class MastermindCV:
         self.ligne_height = self.position_height + self.padding + self.info_height + self.padding
 
         self.frame_position = 0
+
+        self.title_width = 300
+        self.title_height = 80
+
+        self.title =  [
+            'ANUMBY',
+            'MasterMind'
+        ]
 
         # -------------------------------------------------
 
@@ -232,18 +240,24 @@ class MastermindCV:
         self.frame_position = help_lignes_width
 
         # taille totale
-        full_width = help_lignes_width + self.ocr.width + self.padding
+        self.full_width = help_lignes_width + self.ocr.width + self.padding
 
-        full_height = self.ocr.height
-        if help_lignes_height > full_height: full_height = help_lignes_height
-        full_height += 2*self.padding
+        self.padding_title = self.padding + self.title_height + self.padding
+        self.full_height = self.padding_title + self.ocr.height
+        if (self.padding_title + help_lignes_height) > self.full_height: self.full_height = self.padding_title + help_lignes_height
+        self.full_height += 2*self.padding
 
-        self.image = np.zeros((full_height, full_width, 3), dtype=np.uint8)
+        self.image = np.zeros((self.full_height, self.full_width, 3), dtype=np.uint8)
+
+    def draw_title(self):
+        x1 = self.padding
+        y1 = self.padding
+        cv2.rectangle(self.image, (x1, y1), (x1 + self.full_width - 2*self.padding, y1 + self.title_height), yellow, -1)
 
     def draw_help(self):
         x1 = self.padding
-        y1 = self.padding
-        cv2.rectangle(self.image, (x1, y1), (self.help_width, self.help_height), cyan, -1)
+        y1 = self.padding_title
+        cv2.rectangle(self.image, (x1, y1), (x1 + self.help_width, y1 + self.help_height), cyan, -1)
 
         y = y1 + 16
         for h in self.help_lines:
@@ -263,10 +277,10 @@ class MastermindCV:
         if P < 4:
             p_min = 4
 
-        y = self.padding
+        y = self.padding_title
         # on affiche successivement toutes les tentatives de combinaisons
         for ligne, jeu in enumerate(self.jeux):
-            x1 = self.help_width + self.padding
+            x1 = self.padding + self.help_width + self.padding
             y1 = y
             labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
             for position in range(P):
@@ -309,7 +323,7 @@ class MastermindCV:
 
                 x1 += self.position_width + self.padding
 
-            x1 = self.help_width + self.padding
+            x1 = self.padding + self.help_width + self.padding
             y1 = y + self.position_height + self.padding
 
             x2 = x1 + self.info_width - self.padding
@@ -339,7 +353,7 @@ class MastermindCV:
         if self.frame is not None:
             # print(self.frame.shape)
             x1 = self.frame_position
-            y1 = self.padding
+            y1 = self.padding_title
 
             self.image[y1:y1 + self.ocr.height, x1:x1 + self.ocr.width] = self.frame
 
@@ -373,12 +387,13 @@ class MastermindCV:
         y = 0
 
         self.build_image()
+        self.draw_title()
         self.draw_help()
         self.draw_lignes(current_position)
         self.draw_frame()
 
         # Afficher l'image
-        cv2.imshow('MasterMind', self.image)
+        cv2.imshow('ANUMBY - MasterMind', self.image)
 
     def valid(self, essai):
         jeu = self.jeu_courant()
