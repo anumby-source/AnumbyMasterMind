@@ -258,7 +258,7 @@ class MastermindCV:
             y += 20
 
     def draw_lignes(self, current_position):
-        print("draw_lignes. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
+        # print("draw_lignes. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
         p_min = P
         if P < 4:
             p_min = 4
