@@ -87,6 +87,10 @@ class Jeu:
         self.info = Jeu.info_start
         self.jeu = [-1 for i in range(P)]
         self.position = -1
+        self.t = time.time()
+
+    def set_time(self):
+        self.t = time.time()
 
 
 class MastermindCV:
@@ -97,24 +101,28 @@ class MastermindCV:
         # Créer une fenêtre OpenCV
         cv2.namedWindow('MasterMind')
 
-        # initialise les lignes d'info
+        # Définir les valeurs possibles
+        self.valeurs = [i for i in range(1, N + 1)]
         self.info_start = "Choisis une position"
+
+        self.restart()
+
+    def restart(self):
+
+        # initialise les lignes d'info
         self.info = []
         self.info.append(self.info_start)
 
-        # Définir les valeurs possibles
-        self.valeurs = [i for i in range(1, N + 1)]
-
         # initialise la combinaison secrète
         self.secret = random.sample(self.valeurs, P)
+
+        self.t0 = time.time()
 
         self.jeux = []
         self.jeux.append(Jeu())
 
         # initialise les jeux successives
         self.lignes = 1
-
-        self.t0 = time.time()
 
         # print("valeurs", self.valeurs, "code", self.secret)
 
@@ -123,6 +131,17 @@ class MastermindCV:
 
     def jeu_courant(self):
         return self.jeux[self.lignes - 1]
+
+    def help(self):
+        """
+        A, B, C, D, ...   : choix de la position
+        I                 : caméra interne
+        R                 : caméra robot
+        Q                 : quit
+        N                 : nouveau jeu
+        Enter             : sélection de la combinaison
+        """
+        pass
 
     def result(self):
         """
@@ -157,6 +176,16 @@ class MastermindCV:
     def draw_ihm(self, current_position=-1):
         # print("draw_ihm. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
 
+        """
+             ---
+             ppp ppp ppp  image
+             info
+             ---
+             ppp ppp ppp
+             info
+             ---
+        """
+
         position_width = 70
         position_height = 50
         padding = 10
@@ -164,23 +193,45 @@ class MastermindCV:
         # zone d'information
         info_height = int(position_height * 0.5)
 
+        help_lines = [
+          "ABC... : position",
+          "I : camera interne",
+          "R : camera robot",
+          "Q : quit",
+          "N : nouveau jeu",
+          "Enter : selection"
+        ]
+
+        help_width = 180
+        help_height = (len(help_lines) + 1) * 20
+
         # chaque ligne de jeu
-        ligne_height = padding + position_height + padding + info_height
+        ligne_height = position_height + padding + info_height + padding
 
         # l'image complète de l'IHM
         p_min = P
         if P < 4:
             p_min = 4
-        self.width1 = padding + p_min * (position_width + padding)
-        self.height1 = padding + self.lignes * ligne_height
 
-        width = self.width1 + self.ocr.width
-        height = self.ocr.height
-        if self.height1 > 480: height = self.height1
+        # taille de la zone des lignes de jeu
+        lignes_width = p_min * (position_width + padding)
+        lignes_height = self.lignes * ligne_height
 
-        self.image = np.zeros((height, width, 3), dtype=np.uint8)
+        # taille avec la zone d'aide
+        help_lignes_width = padding + help_width + padding + lignes_width
+        help_lignes_height = help_height
+        if lignes_height > help_height:
+            help_lignes_height = lignes_height
+        help_lignes_height += padding
 
-        # np.copy()
+        # taille totale
+        full_width = help_lignes_width + self.ocr.width + padding
+
+        full_height = self.ocr.height
+        if help_lignes_height > full_height: full_height = help_lignes_height
+        full_height += 2*padding
+
+        self.image = np.zeros((full_height, full_width, 3), dtype=np.uint8)
 
         y = 0
 
@@ -197,11 +248,27 @@ class MastermindCV:
         else:
             camera_tag = "R"
 
+        x1 = padding
+        y1 = padding
+        cv2.rectangle(self.image, (x1, y1), (help_width, help_height), cyan, -1)
+
+        y = y1 + 15
+        for h in help_lines:
+            cv2.putText(self.image,
+                        text=h,
+                        org=(x1 + 5, y),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.5,
+                        color=red,
+                        thickness=1,
+                        lineType=cv2.LINE_AA)
+            y += 20
+
+        y = padding
         # on affiche successivement toutes les tentatives de combinaisons
         for ligne, jeu in enumerate(self.jeux):
-
-            x1 = padding
-            y1 = y + padding
+            x1 = help_width + padding
+            y1 = y
             labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
             for position in range(P):
                 x2 = x1 + position_width
@@ -210,9 +277,11 @@ class MastermindCV:
                 # la couleur change pour la zone en cours
                 color_fond = green
                 color_char = red
-                if ligne == (self.lignes - 1) and position == current_position:
-                    color_fond = red
-                    color_char = white
+                if ligne == (self.lignes - 1):
+                    jeu.set_time()
+                    if position == current_position:
+                        color_fond = red
+                        color_char = white
 
                 # print("draw_ihm. i=", i, x1, y1, x2, y2)
                 cv2.rectangle(self.image, (x1, y1), (x2, y2), color_fond, -1)
@@ -227,6 +296,7 @@ class MastermindCV:
                             lineType=cv2.LINE_AA)
 
                 j = jeu.jeu[position]
+
                 # print("draw_ihm. position=", position, i, "jeu=", j)
                 if j > 0:
                     cv2.putText(self.image,
@@ -240,14 +310,14 @@ class MastermindCV:
 
                 x1 += position_width + padding
 
-            x1 = padding
-            y1 = y + padding + position_height + padding
+            x1 = help_width + padding
+            y1 = y + position_height + padding
 
             x2 = x1 + p_min * (position_width + padding) - padding
             y2 = y1 + info_height
             c = white
 
-            now = int(time.time() - self.t0)
+            now = int(jeu.t - self.t0)
             minutes = int(now / 60)
             secondes = now % 60
             cv2.rectangle(self.image, (x1, y1), (x2, y2), c, -1)  # Carré 1 (bleu)
@@ -264,7 +334,10 @@ class MastermindCV:
 
         if self.frame is not None:
             # print(self.frame.shape)
-            self.image[0:self.ocr.height, self.width1:self.width1 + self.ocr.width] = self.frame
+            x1 = help_width + padding + p_min * (position_width + padding)
+            y1 = padding
+
+            self.image[y1:y1 + self.ocr.height, x1:x1 + self.ocr.width] = self.frame
 
         # Afficher l'image
         cv2.imshow('MasterMind', self.image)
@@ -333,7 +406,7 @@ class MastermindCV:
             if k != 255:
                 # print("k=", k)
                 pass
-            if k == ord('q'):
+            if k == ord('Q') or k == ord('q'):
                 # quit
                 break
 
@@ -352,17 +425,19 @@ class MastermindCV:
             elif k == ord('r') or k == ord('R'):
                 # robot
                 mode_camera = robot_mode
+            elif k == ord('n') or k == ord('N'):
+                self.restart()
             elif k == 13:
                 # enter => valider une combinaison
                 zone = 4
 
             jeu = self.jeu_courant()
 
-            if zone >= 0 and zone <= 3:
+            if zone >= 0 and zone <= P:
                 # print("zone=", zone)
                 self.draw_ihm(zone)
                 jeu.position = zone
-            if zone == 4:
+            elif zone == 4:
                 # on teste la combinaison
                 ok = self.result()
                 if not ok:
