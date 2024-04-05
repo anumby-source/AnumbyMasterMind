@@ -176,6 +176,7 @@ class MastermindCV:
 
         # initialise les jeux successives
         self.lignes = 1
+        self.box = None
 
         # print("valeurs", self.valeurs, "code", self.secret)
 
@@ -381,6 +382,13 @@ class MastermindCV:
                         thickness=1,
                         lineType=cv2.LINE_AA)
 
+            if not self.box is None:
+                (px1, py1) = self.box[0]
+                (px2, py2) = self.box[2]
+
+                cv2.rectangle(self.image, (px1 + x1, py1 + y1), (px2 + x1, py2 + y1), red, 1)
+
+
 
     # Fonction pour dessiner l'IHM
     def draw_ihm(self, current_position=-1):
@@ -446,7 +454,7 @@ class MastermindCV:
         else:
             condition = ""
             for (bbox, text, prob) in result:
-                if prob > 0.5 and contains_integer(text):
+                if prob > 0.8 and contains_integer(text):
                     t = int(text)
                     if t > 0 and t <= N:
                         # print("t=", t, "position=", jeu.position, "jeu=", jeu)
@@ -459,6 +467,7 @@ class MastermindCV:
                                 jeu.info = f"doublons interdits ({t})"
                         self.proba = prob
                         self.chiffre = t
+                        self.box = bbox
                         self.draw_ihm(jeu.position)
 
                     break
@@ -512,8 +521,11 @@ class MastermindCV:
                 # on teste la combinaison
                 ok = self.result()
                 if not ok:
+                    old = self.jeu_courant()
                     self.lignes += 1
                     self.jeux.append(Jeu())
+                    jeu = self.jeu_courant()
+                    jeu.jeu = [k for k in old.jeu]
                     self.draw_ihm()
 
         cv2.destroyAllWindows()
