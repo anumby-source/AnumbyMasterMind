@@ -18,6 +18,14 @@ mode_camera = internal_mode
 image_w  = 96   # largeur image camera
 image_h  = 96   # hauteur image camera
 
+white = (255, 255, 255)
+blue = (255, 0, 0)
+green = (0, 255, 0)
+red = (0, 0, 255)
+yellow = (0, 255, 255)
+magenta = (255, 0, 255)
+cyan = (255, 255, 0)
+
 
 class OCR:
     """
@@ -105,6 +113,39 @@ class MastermindCV:
         self.valeurs = [i for i in range(1, N + 1)]
         self.info_start = "Choisis une position"
 
+        #-------------------------------------------------
+
+        self.padding = 10
+
+        self.help_lines = [
+          "ABC... : position",
+          "Enter : selection",
+          "",
+          "I : camera interne",
+          "R : camera robot",
+          "N : nouveau jeu",
+          "Q : quit",
+        ]
+
+        self.help_width = 180
+        self.help_height = (len(self.help_lines) + 1) * 20
+
+        self.position_width = 70
+        self.position_height = 50
+
+        # zone d'information
+        self.info_height = int(self.position_height * 0.5)
+
+        if mode_camera == internal_mode:
+            self.camera_tag = "I"
+        else:
+            self.camera_tag = "R"
+
+        # chaque ligne de jeu
+        self.ligne_height = self.position_height + self.padding + self.info_height + self.padding
+
+        # -------------------------------------------------
+
         self.restart()
 
     def restart(self):
@@ -131,17 +172,6 @@ class MastermindCV:
 
     def jeu_courant(self):
         return self.jeux[self.lignes - 1]
-
-    def help(self):
-        """
-        A, B, C, D, ...   : choix de la position
-        I                 : caméra interne
-        R                 : caméra robot
-        Q                 : quit
-        N                 : nouveau jeu
-        Enter             : sélection de la combinaison
-        """
-        pass
 
     def result(self):
         """
@@ -172,6 +202,135 @@ class MastermindCV:
 
         return r
 
+    def build_image(self):
+        # l'image complète de l'IHM
+        p_min = P
+        if P < 4:
+            p_min = 4
+
+        # taille de la zone des lignes de jeu
+        lignes_width = p_min * (self.position_width + self.padding)
+        lignes_height = self.lignes * self.ligne_height
+
+        # taille avec la zone d'aide
+        help_lignes_width = self.padding + self.help_width + self.padding + lignes_width
+        help_lignes_height = self.help_height
+        if lignes_height > self.help_height:
+            help_lignes_height = lignes_height
+        help_lignes_height += self.padding
+
+        # taille totale
+        full_width = help_lignes_width + self.ocr.width + self.padding
+
+        full_height = self.ocr.height
+        if help_lignes_height > full_height: full_height = help_lignes_height
+        full_height += 2*self.padding
+
+        self.image = np.zeros((full_height, full_width, 3), dtype=np.uint8)
+
+    def draw_help(self):
+        x1 = self.padding
+        y1 = self.padding
+        cv2.rectangle(self.image, (x1, y1), (self.help_width, self.help_height), cyan, -1)
+
+        y = y1 + 16
+        for h in self.help_lines:
+            cv2.putText(self.image,
+                        text=h,
+                        org=(x1 + 5, y),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.5,
+                        color=red,
+                        thickness=1,
+                        lineType=cv2.LINE_AA)
+            y += 20
+
+    def draw_lignes(self, current_position):
+        # l'image complète de l'IHM
+        p_min = P
+        if P < 4:
+            p_min = 4
+
+        y = self.padding
+        # on affiche successivement toutes les tentatives de combinaisons
+        for ligne, jeu in enumerate(self.jeux):
+            x1 = self.help_width + self.padding
+            y1 = y
+            labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+            for position in range(P):
+                x2 = x1 + self.position_width
+                y2 = y1 + self.position_height
+                # Dessiner les zones sur l'image
+                # la couleur change pour la zone en cours
+                color_fond = green
+                color_char = red
+                if ligne == (self.lignes - 1):
+                    jeu.set_time()
+                    if position == current_position:
+                        color_foposition_widthnd = red
+                        color_char = white
+
+                # print("draw_ihm. i=", i, x1, y1, x2, y2)
+                cv2.rectangle(self.image, (x1, y1), (x2, y2), color_fond, -1)
+
+                cv2.putText(self.image,
+                            text=labels[position],
+                            org=(x1 + 10, y1 + int(self.position_height * 0.3)),
+                            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                            fontScale=0.6,
+                            color=white,
+                            thickness=2,
+                            lineType=cv2.LINE_AA)
+
+                j = jeu.jeu[position]
+
+                # print("draw_ihm. position=", position, i, "jeu=", j)
+                if j > 0:
+                    cv2.putText(self.image,
+                                text=f"{j}",
+                                org=(x1 + 30, y1 + int(self.position_height * 0.8)),
+                                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                fontScale=1.8,
+                                color=color_char,
+                                thickness=2,
+                                lineType=cv2.LINE_AA)
+
+                x1 += self.position_width + self.padding
+
+            x1 = self.help_width + self.padding
+            y1 = y + self.position_height + self.padding
+
+            x2 = x1 + p_min * (self.position_width + self.padding) - self.padding
+            y2 = y1 + self.info_height
+            c = white
+
+            now = int(jeu.t - self.t0)
+            minutes = int(now / 60)
+            secondes = now % 60
+            cv2.rectangle(self.image, (x1, y1), (x2, y2), c, -1)  # Carré 1 (bleu)
+            cv2.putText(self.image,
+                        text="(" + self.camera_tag + ") " + jeu.info + f" {minutes}m{secondes}s",
+                        org=(x1 + 10, y1 + 18),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.6,
+                        color=red,
+                        thickness=1,
+                        lineType=cv2.LINE_AA)
+
+            y += self.ligne_height
+
+    def draw_frame(self):
+        p_min = P
+        if P < 4:
+            p_min = 4
+
+        if self.frame is not None:
+            # print(self.frame.shape)
+            x1 = self.help_width + self.padding + p_min * (self.position_width + self.padding)
+            y1 = self.padding
+
+            self.image[y1:y1 + self.ocr.height, x1:x1 + self.ocr.width] = self.frame
+
     # Fonction pour dessiner l'IHM
     def draw_ihm(self, current_position=-1):
         # print("draw_ihm. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
@@ -186,159 +345,13 @@ class MastermindCV:
              ---
         """
 
-        position_width = 70
-        position_height = 50
-        padding = 10
-
-        # zone d'information
-        info_height = int(position_height * 0.5)
-
-        help_lines = [
-          "ABC... : position",
-          "Enter : selection",
-          "",
-          "I : camera interne",
-          "R : camera robot",
-          "N : nouveau jeu",
-          "Q : quit",
-        ]
-
-        help_width = 180
-        help_height = (len(help_lines) + 1) * 20
-
-        # chaque ligne de jeu
-        ligne_height = position_height + padding + info_height + padding
-
-        # l'image complète de l'IHM
-        p_min = P
-        if P < 4:
-            p_min = 4
-
-        # taille de la zone des lignes de jeu
-        lignes_width = p_min * (position_width + padding)
-        lignes_height = self.lignes * ligne_height
-
-        # taille avec la zone d'aide
-        help_lignes_width = padding + help_width + padding + lignes_width
-        help_lignes_height = help_height
-        if lignes_height > help_height:
-            help_lignes_height = lignes_height
-        help_lignes_height += padding
-
-        # taille totale
-        full_width = help_lignes_width + self.ocr.width + padding
-
-        full_height = self.ocr.height
-        if help_lignes_height > full_height: full_height = help_lignes_height
-        full_height += 2*padding
-
-        self.image = np.zeros((full_height, full_width, 3), dtype=np.uint8)
 
         y = 0
 
-        white = (255, 255, 255)
-        blue = (255, 0, 0)
-        green = (0, 255, 0)
-        red = (0, 0, 255)
-        yellow = (0, 255, 255)
-        magenta = (255, 0, 255)
-        cyan = (255, 255, 0)
-
-        if mode_camera == internal_mode:
-            camera_tag = "I"
-        else:
-            camera_tag = "R"
-
-        x1 = padding
-        y1 = padding
-        cv2.rectangle(self.image, (x1, y1), (help_width, help_height), cyan, -1)
-
-        y = y1 + 16
-        for h in help_lines:
-            cv2.putText(self.image,
-                        text=h,
-                        org=(x1 + 5, y),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=0.5,
-                        color=red,
-                        thickness=1,
-                        lineType=cv2.LINE_AA)
-            y += 20
-
-        y = padding
-        # on affiche successivement toutes les tentatives de combinaisons
-        for ligne, jeu in enumerate(self.jeux):
-            x1 = help_width + padding
-            y1 = y
-            labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-            for position in range(P):
-                x2 = x1 + position_width
-                y2 = y1 + position_height
-                # Dessiner les zones sur l'image
-                # la couleur change pour la zone en cours
-                color_fond = green
-                color_char = red
-                if ligne == (self.lignes - 1):
-                    jeu.set_time()
-                    if position == current_position:
-                        color_fond = red
-                        color_char = white
-
-                # print("draw_ihm. i=", i, x1, y1, x2, y2)
-                cv2.rectangle(self.image, (x1, y1), (x2, y2), color_fond, -1)
-
-                cv2.putText(self.image,
-                            text=labels[position],
-                            org=(x1 + 10, y1 + int(position_height * 0.3)),
-                            fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                            fontScale=0.6,
-                            color=white,
-                            thickness=2,
-                            lineType=cv2.LINE_AA)
-
-                j = jeu.jeu[position]
-
-                # print("draw_ihm. position=", position, i, "jeu=", j)
-                if j > 0:
-                    cv2.putText(self.image,
-                                text=f"{j}",
-                                org=(x1 + 30, y1 + int(position_height * 0.8)),
-                                fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                                fontScale=1.8,
-                                color=color_char,
-                                thickness=2,
-                                lineType=cv2.LINE_AA)
-
-                x1 += position_width + padding
-
-            x1 = help_width + padding
-            y1 = y + position_height + padding
-
-            x2 = x1 + p_min * (position_width + padding) - padding
-            y2 = y1 + info_height
-            c = white
-
-            now = int(jeu.t - self.t0)
-            minutes = int(now / 60)
-            secondes = now % 60
-            cv2.rectangle(self.image, (x1, y1), (x2, y2), c, -1)  # Carré 1 (bleu)
-            cv2.putText(self.image,
-                        text="(" + camera_tag + ") " + jeu.info + f" {minutes}m{secondes}s",
-                        org=(x1 + 10, y1 + 18),
-                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=0.6,
-                        color=red,
-                        thickness=1,
-                        lineType=cv2.LINE_AA)
-
-            y += ligne_height
-
-        if self.frame is not None:
-            # print(self.frame.shape)
-            x1 = help_width + padding + p_min * (position_width + padding)
-            y1 = padding
-
-            self.image[y1:y1 + self.ocr.height, x1:x1 + self.ocr.width] = self.frame
+        self.build_image()
+        self.draw_help()
+        self.draw_lignes(current_position)
+        self.draw_frame()
 
         # Afficher l'image
         cv2.imshow('MasterMind', self.image)
