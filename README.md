@@ -6,6 +6,8 @@ vous disposez de plusieurs applications:
 
 - [AnumbyMasterMind](#anumbymastermind)
 
+![Run](capture.jpg)
+
 ## AnumbyMasterMind
 
 - il y a N couleurs possibles 1, .. , N (par défaut N=6)
