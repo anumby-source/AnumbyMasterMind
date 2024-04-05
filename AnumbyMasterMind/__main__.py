@@ -195,11 +195,12 @@ class MastermindCV:
 
         help_lines = [
           "ABC... : position",
+          "Enter : selection",
+          "",
           "I : camera interne",
           "R : camera robot",
-          "Q : quit",
           "N : nouveau jeu",
-          "Enter : selection"
+          "Q : quit",
         ]
 
         help_width = 180
@@ -252,7 +253,7 @@ class MastermindCV:
         y1 = padding
         cv2.rectangle(self.image, (x1, y1), (help_width, help_height), cyan, -1)
 
-        y = y1 + 15
+        y = y1 + 16
         for h in help_lines:
             cv2.putText(self.image,
                         text=h,
