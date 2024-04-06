@@ -127,6 +127,10 @@ class MastermindCV:
             "Enter : selection",
             "X : solution",
             "",
+            "F : facile (2/3)",
+            "M : difficile (3/5)",
+            "T : tres difficile (6/6)",
+            "",
             "I : camera interne",
             "R : camera robot",
             "N : nouveau jeu",
@@ -486,6 +490,7 @@ class MastermindCV:
         self.draw_ihm(jeu.position)
 
     def run(self):
+        global N, P, max_lignes
         global mode_camera
 
         while True:
@@ -520,6 +525,21 @@ class MastermindCV:
                 self.restart()
             elif k == ord('X') or k == ord('x'):
                 print(self.secret)
+            elif k == ord('F') or k == ord('f'):
+                N = 3
+                P = 2
+                max_lignes = P*2
+                self.restart()
+            elif k == ord('M') or k == ord('m'):
+                N = 6
+                P = 3
+                max_lignes = P*2
+                self.restart()
+            elif k == ord('T') or k == ord('t'):
+                N = 6
+                P = 6
+                max_lignes = P*2
+                self.restart()
             elif k == 13:
                 # enter => valider une combinaison
                 zone = 4
