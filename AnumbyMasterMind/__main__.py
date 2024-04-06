@@ -9,10 +9,12 @@ import socket
 
 N = 6
 P = 3
+max_lignes = 8
 
 internal_mode = 0
 robot_mode = 1
 mode_camera = internal_mode
+
 
 # camera
 image_w  = 96   # largeur image camera
@@ -371,7 +373,15 @@ class MastermindCV:
 
             self.image[y1:y1 + self.ocr.height, x1:x1 + self.ocr.width] = self.frame
 
-            text = "p({})={:5.2f}".format(str(self.chiffre), self.proba)
+            if self.chiffre == 0:
+                text = "aucune detection"
+            else:
+                text = "p({})={:5.2f}".format(str(self.chiffre), self.proba)
+
+                if not self.box is None:
+                    (px1, py1) = self.box[0]
+                    (px2, py2) = self.box[2]
+                    cv2.rectangle(self.image, (px1 + x1, py1 + y1), (px2 + x1, py2 + y1), red, 1)
 
             cv2.putText(self.image,
                         text=text,
@@ -382,11 +392,6 @@ class MastermindCV:
                         thickness=1,
                         lineType=cv2.LINE_AA)
 
-            if not self.box is None:
-                (px1, py1) = self.box[0]
-                (px2, py2) = self.box[2]
-
-                cv2.rectangle(self.image, (px1 + x1, py1 + y1), (px2 + x1, py2 + y1), red, 1)
 
 
 
@@ -443,6 +448,11 @@ class MastermindCV:
 
         self.draw_ihm(jeu.position)
 
+        if self.lignes >= max_lignes:
+            jeu.info = "Perdu! trop d'essais"
+            self.draw_ihm(jeu.position)
+            return
+
         if jeu.position == -1:
             jeu.info = f"choisis une position"
         else:
@@ -451,26 +461,29 @@ class MastermindCV:
         if result is None:
             jeu.info = f"pas d'image"
             self.draw_ihm(jeu.position)
-        else:
-            condition = ""
-            for (bbox, text, prob) in result:
-                if prob > 0.8 and contains_integer(text):
-                    t = int(text)
-                    if t > 0 and t <= N:
-                        # print("t=", t, "position=", jeu.position, "jeu=", jeu)
-                        if jeu.position >= 0:
-                            if self.valid(t):
-                                jeu.jeu[jeu.position] = t
-                                # print("process_frame. position=", self.position, "jeu=", jeu)
-                                jeu.info = f"chiffre {t} choisi"
-                            else:
-                                jeu.info = f"doublons interdits ({t})"
-                        self.proba = prob
-                        self.chiffre = t
-                        self.box = bbox
-                        self.draw_ihm(jeu.position)
+            return
 
-                    break
+        self.proba = 0
+        self.chiffre = 0
+        self.box = None
+        for (bbox, text, prob) in result:
+            if prob > 0.8 and contains_integer(text):
+                t = int(text)
+                if t > 0 and t <= N:
+                    # print("t=", t, "position=", jeu.position, "jeu=", jeu)
+                    if jeu.position >= 0:
+                        if self.valid(t):
+                            jeu.jeu[jeu.position] = t
+                            # print("process_frame. position=", self.position, "jeu=", jeu)
+                            jeu.info = f"chiffre {t} choisi"
+                            self.proba = prob
+                            self.chiffre = t
+                            self.box = bbox
+                        else:
+                            jeu.info = f"doublons interdits ({t})"
+                break
+
+        self.draw_ihm(jeu.position)
 
     def run(self):
         global mode_camera
@@ -522,10 +535,14 @@ class MastermindCV:
                 ok = self.result()
                 if not ok:
                     old = self.jeu_courant()
-                    self.lignes += 1
-                    self.jeux.append(Jeu())
-                    jeu = self.jeu_courant()
-                    jeu.jeu = [k for k in old.jeu]
+                    if self.lignes >= max_lignes:
+                        old.info = "Perdu! trop d'essais"
+                    else:
+                        self.lignes += 1
+                        self.jeux.append(Jeu())
+                        jeu = self.jeu_courant()
+                        jeu.jeu = [k for k in old.jeu]
+
                     self.draw_ihm()
 
         cv2.destroyAllWindows()
