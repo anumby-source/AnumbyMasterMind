@@ -7,8 +7,8 @@ import requests
 import time
 import socket
 
-N = 6
-P = 3
+N = 3
+P = 2
 max_lignes = 8
 
 internal_mode = 0
@@ -110,6 +110,7 @@ class MastermindCV:
 
         # Créer une fenêtre OpenCV
         cv2.namedWindow('ANUMBY - MasterMind')
+        cv2.setMouseCallback('ANUMBY - MasterMind', self.mouse)
 
         # Définir les valeurs possibles
         self.valeurs = [i for i in range(1, N + 1)]
@@ -118,17 +119,19 @@ class MastermindCV:
         self.proba = 0
         self.chiffre = 0
 
+        self.show_secret = False
+
         #-------------------------------------------------
 
         self.padding = 10
 
         self.help_lines = [
-            "ABC... : position",
+            f"1... : position",
             "Enter : selection",
             "X : solution",
             "",
             "F : facile (2/3)",
-            "M : difficile (3/5)",
+            "D : difficile (3/5)",
             "T : tres difficile (6/6)",
             "",
             "I : camera interne",
@@ -137,23 +140,32 @@ class MastermindCV:
             "Q : quit",
         ]
 
-        self.help_width = 180
-        self.help_height = (len(self.help_lines) + 1) * 20
-
         self.position_width = 70
         self.position_height = 50
+
+        self.help_width = 180
+
+        (width, height), baseline = cv2.getTextSize("",
+                                                    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                                    fontScale=0.5,
+                                                    thickness=1)
+
+        self.help_height = (len(self.help_lines) + 1) * (height + baseline + 2)
 
         # zone d'information
         self.info_width = 370
         self.info_height = int(self.position_height * 0.5)
 
+        self.secret_width = self.help_width
+        self.secret_height = self.info_height
+
+        # chaque ligne de jeu
+        self.ligne_height = self.position_height + self.padding + self.info_height + self.padding
+
         if mode_camera == internal_mode:
             self.camera_tag = "I"
         else:
             self.camera_tag = "R"
-
-        # chaque ligne de jeu
-        self.ligne_height = self.position_height + self.padding + self.info_height + self.padding
 
         self.frame_position = 0
 
@@ -162,11 +174,204 @@ class MastermindCV:
 
         self.title =  'ANUMBY - MasterMind'
 
+        self.mouse_x1 = 0
+        self.mouse_y1 = 0
+        self.mouse_x2 = 0
+        self.mouse_y2 = 0
+
+        self.mode_difficulty('F')
+
         # -------------------------------------------------
 
         self.restart()
 
+    def draw_help_line(self, help_line):
+        lignes = len(self.help_lines)
+        h = int(self.help_height / lignes)
+
+        h_left = self.padding
+        h_right = h_left + self.help_width
+        h_top = self.padding + self.title_height + self.padding
+        h_bottom = h_top + self.help_height
+
+        self.mouse_x1 = h_left
+        self.mouse_y1 = h_top + help_line * h
+        self.mouse_x2 = self.mouse_x1 + self.help_width
+        self.mouse_y2 = self.mouse_y1 + h
+
+    def mode_difficulty(self, difficulty='F'):
+        global N, P, max_lignes
+
+        if difficulty == 'F':
+            N = 3
+            P = 2
+            max_lignes = P * 2
+        elif difficulty == 'D':
+            N = 6
+            P = 3
+            max_lignes = P * 2
+            self.restart()
+        elif difficulty == 'T':
+            N = 6
+            P = 6
+            max_lignes = P * 2
+            self.restart()
+        self.restart()
+
+    def action(self, commande):
+        global N, P, max_lignes
+        global mode_camera
+
+        zones = ['1', '2', '3', '4', '5', '6', '7', '8']
+
+        lignes = len(self.help_lines)
+        h = int(self.help_height / lignes)
+
+        zone = -1
+
+        # print(f"action> {commande}")
+
+        if commande == 'Q':
+            help_line = 11
+            return
+        elif commande in zones:
+            help_line = 0
+            zone = zones.index(commande)
+        elif commande == 'I':
+            help_line = 8
+            mode_camera = internal_mode
+        elif commande == 'R':
+            help_line = 9
+            mode_camera = robot_mode
+        elif commande == 'N':
+            help_line = 10
+            self.restart()
+        elif commande == 'X':
+            help_line = 2
+            self.show_secret = not self.show_secret
+        elif commande == 'F':
+            help_line = 4
+            self.mode_difficulty('F')
+        elif commande == 'D':
+            help_line = 5
+            self.mode_difficulty('D')
+        elif commande == 'T':
+            help_line = 6
+            self.mode_difficulty('T')
+        elif commande == 'Z':
+            # enter => valider une combinaison
+            help_line = 1
+            zone = 4
+
+        self.draw_help_line(help_line)
+        jeu = self.jeu_courant()
+
+        if zone >= 0 and zone <= P:
+            # print("zone=", zone)
+            jeu.position = zone
+            self.draw_ihm(zone)
+        elif zone == 4:
+            # on teste la combinaison
+            ok = self.result()
+            if not ok:
+                old = self.jeu_courant()
+                if self.lignes >= max_lignes:
+                    old.info = "Perdu! trop d'essais"
+                else:
+                    self.lignes += 1
+                    self.jeux.append(Jeu())
+                    jeu = self.jeu_courant()
+                    jeu.jeu = [k for k in old.jeu]
+
+                self.draw_ihm()
+
+    def mouse(self, event, x, y, flags, param):
+
+        # pour détecter un click dans la zone help
+        h_left = self.padding
+        h_right = h_left + self.help_width
+        h_top = self.padding + self.title_height + self.padding
+        h_bottom = h_top + self.help_height
+
+        # pour détecter un click dans la zone des pavés
+        p_left = self.padding + self.help_width + self.padding
+        p_right = p_left + P*(self.position_width + self.padding)
+        p_top = self.padding + self.title_height + self.padding
+        p_bottom = h_top + self.position_height
+
+        if event == cv2.EVENT_LBUTTONUP:
+            if x > h_left and x < h_right and y > h_top and y < h_bottom:
+                # on a clické dans la zone help
+                # print("help")
+                lignes = len(self.help_lines)
+                h = int(self.help_height / lignes) # hauteur d'une ligne de help
+
+                help_line = int((y - h_top) / h)
+
+                self.mouse_x1 = h_left
+                self.mouse_y1 = h_top + help_line*h
+                self.mouse_x2 = self.mouse_x1 + self.help_width
+                self.mouse_y2 = self.mouse_y1 + h
+
+                if help_line == 0:
+                    # 1..P
+                    pass
+                if help_line == 1:
+                    # enter
+                    self.action('Z')
+                if help_line == 2:
+                    # X
+                    self.action('X')
+                if help_line == 3:
+                    # none
+                    pass
+                if help_line == 4:
+                    # F
+                    self.action('F')
+                if help_line == 5:
+                    # M
+                    self.action('D')
+                if help_line == 6:
+                    # T
+                    self.action('T')
+                if help_line == 7:
+                    # none
+                    pass
+                if help_line == 8:
+                    # I
+                    self.action('I')
+                if help_line == 9:
+                    # R
+                    self.action('R')
+                if help_line == 10:
+                    # N
+                    self.action('N')
+                if help_line == 11:
+                    # Q
+                    self.action('Q')
+
+            elif x > p_left and x < p_right and y > p_top and y < p_bottom:
+                positions_width = P * (self.position_width + self.padding)
+                w = self.position_width + self.padding # largeur d'une position
+                position = int((x - p_left) / w) + 1
+                # print(f"positions> {position}")
+                self.action(f'{position}')
+
+            jeu = self.jeu_courant()
+            self.draw_ihm(jeu.position)
+
+        """
+        if event == cv2.EVENT_LBUTTONUP:
+            print(f"mouse UP {x} {y} {flags} {param}")
+        elif event == cv2.EVENT_LBUTTONDOWN:
+            print(f"mouse DOWN {x} {y} {flags} {param}")
+        else:
+            print(f"mouse {event} {x} {y} {flags} {param}")
+        """
+
     def restart(self):
+
+        self.valeurs = [i for i in range(1, N + 1)]
 
         # initialise les lignes d'info
         self.info = []
@@ -291,6 +496,26 @@ class MastermindCV:
                         lineType=cv2.LINE_AA)
             y += 20
 
+        cv2.rectangle(self.image,
+                      (self.mouse_x1, self.mouse_y1),
+                      (self.mouse_x2, self.mouse_y2), red, 2)
+
+    def draw_secret(self):
+        x1 = self.padding
+        y1 = self.padding + self.title_height + self.padding + self.help_height + self.padding
+
+        cv2.rectangle(self.image, (x1, y1), (x1 + self.secret_width, y1 + self.secret_height), magenta, -1)
+
+        if self.show_secret:
+            cv2.putText(self.image,
+                        text=f"secret={self.secret}",
+                        org=(x1 + 10, y1 + 18),
+                        fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                        fontScale=0.6,
+                        color=white,
+                        thickness=1,
+                        lineType=cv2.LINE_AA)
+
     def draw_lignes(self, current_position):
         # print("draw_lignes. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
         p_min = P
@@ -302,7 +527,7 @@ class MastermindCV:
         for ligne, jeu in enumerate(self.jeux):
             x1 = self.padding + self.help_width + self.padding
             y1 = y
-            labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+            labels = ['1', '2', '3', '4', '5', '6', '7', '8']
             for position in range(P):
                 x2 = x1 + self.position_width
                 y2 = y1 + self.position_height
@@ -419,6 +644,7 @@ class MastermindCV:
         self.build_image()
         self.draw_title()
         self.draw_help()
+        self.draw_secret()
         self.draw_lignes(current_position)
         self.draw_frame()
 
@@ -490,9 +716,6 @@ class MastermindCV:
         self.draw_ihm(jeu.position)
 
     def run(self):
-        global N, P, max_lignes
-        global mode_camera
-
         while True:
             # Traitement de l'image pour détecter les chiffres et les reconnaître
             self.process_frame()
@@ -504,66 +727,44 @@ class MastermindCV:
                 pass
             if k == ord('Q') or k == ord('q'):
                 # quit
+                self.action('Q')
                 break
 
             zone = -1
-            if k == ord('a') or k == ord('A'):
-                zone = 0
-            elif k == ord('b') or k == ord('B'):
-                zone = 1
-            elif k == ord('c') or k == ord('C'):
-                zone = 2
-            elif k == ord('d') or k == ord('D'):
-                zone = 3
+            if k == ord('1'):
+                self.action('1')
+            elif k == ord('2'):
+                self.action('2')
+            elif k == ord('3'):
+                self.action('3')
+            elif k == ord('4'):
+                self.action('4')
+            elif k == ord('5'):
+                self.action('5')
+            elif k == ord('6'):
+                self.action('6')
+            elif k == ord('7'):
+                self.action('7')
+            elif k == ord('8'):
+                self.action('8')
             elif k == ord('i') or k == ord('I'):
                 # internal camera
-                mode_camera = internal_mode
+                self.action('I')
             elif k == ord('r') or k == ord('R'):
                 # robot
-                mode_camera = robot_mode
+                self.action('R')
             elif k == ord('n') or k == ord('N'):
-                self.restart()
+                self.action('N')
             elif k == ord('X') or k == ord('x'):
-                print(self.secret)
+                self.action('X')
             elif k == ord('F') or k == ord('f'):
-                N = 3
-                P = 2
-                max_lignes = P*2
-                self.restart()
-            elif k == ord('M') or k == ord('m'):
-                N = 6
-                P = 3
-                max_lignes = P*2
-                self.restart()
+                self.action('F')
+            elif k == ord('D') or k == ord('d'):
+                self.action('D')
             elif k == ord('T') or k == ord('t'):
-                N = 6
-                P = 6
-                max_lignes = P*2
-                self.restart()
+                self.action('T')
             elif k == 13:
-                # enter => valider une combinaison
-                zone = 4
-
-            jeu = self.jeu_courant()
-
-            if zone >= 0 and zone <= P:
-                # print("zone=", zone)
-                jeu.position = zone
-                self.draw_ihm(zone)
-            elif zone == 4:
-                # on teste la combinaison
-                ok = self.result()
-                if not ok:
-                    old = self.jeu_courant()
-                    if self.lignes >= max_lignes:
-                        old.info = "Perdu! trop d'essais"
-                    else:
-                        self.lignes += 1
-                        self.jeux.append(Jeu())
-                        jeu = self.jeu_courant()
-                        jeu.jeu = [k for k in old.jeu]
-
-                    self.draw_ihm()
+                self.action('Z')
 
         cv2.destroyAllWindows()
 
