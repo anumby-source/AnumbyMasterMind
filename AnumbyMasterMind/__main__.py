@@ -13,7 +13,7 @@ max_lignes = 8
 
 internal_mode = 0
 robot_mode = 1
-mode_camera = internal_mode
+mode_camera = robot_mode
 
 
 # camera
@@ -38,6 +38,9 @@ class OCR:
     def __init__(self):
         self.reader = easyocr.Reader(['fr'])  # Utiliser EasyOCR avec la langue anglaise
         self.count = 0
+        self.set_camera_mode(mode_camera)
+
+    def set_camera_mode(self, mode):
         if mode_camera == internal_mode:
             self.width = 640
             self.height = 480
@@ -60,14 +63,27 @@ class OCR:
 
     def esp32cam(self):
         try:
+            # self.fd.write('      fin de boucle {:6.3f}\r\n'.format(perf_counter() - self.t))
+            # self.fd.write('image {}\r\n'.format(self.count))
+            # self.t = perf_counter()
+            # print(f"sendto> {self.addr_port} {self.color}")
             self.s.sendto(self.color, self.addr_port)
             buf = self.s.recvfrom(50000)
+            # self.fd.write('     received {:6.3f}\r\n'.format(perf_counter() - self.t))
+            # self.count += 1
             raw_img = np.asarray(bytearray(buf[0]), dtype=np.uint8)
-            return raw_img
-        except:
-            # timeout de réception de l'image
-            # print('no image ', self.count)
-            self.count += 1
+            frame = cv2.imdecode(raw_img, cv2.IMREAD_COLOR)
+            return frame
+
+            # frame = cv2.imdecode(raw_img, cv2.IMREAD_COLOR)
+            # self.fd.write('     decoded {:6.3f}\r\n'.format(perf_counter() - self.t))
+            # res = self.reader.readtext(frame)
+            # self.fd.write('     processed {:6.3f}\r\n'.format(perf_counter() - self.t))
+            # print('image ', self.count)
+            # return res, frame
+        except:          # timeout de réception de l'image
+            # self.fd.write('     no image {:6.3f}\r\n'.format(perf_counter()-self.t))
+            self.s.sendto(self.color, self.addr_port)
             return None
 
         """
@@ -103,9 +119,10 @@ class Jeu:
         self.t = time.time()
 
 
-class MastermindCV:
+class MastermindCV(OCR):
     def __init__(self):
-        self.ocr = OCR()
+        super().__init__()
+        # self.ocr = OCR()
         self.frame = None
 
         # Créer une fenêtre OpenCV
@@ -240,9 +257,11 @@ class MastermindCV:
         elif commande == 'I':
             help_line = 8
             mode_camera = internal_mode
+            self.set_camera_mode(mode_camera)
         elif commande == 'R':
             help_line = 9
             mode_camera = robot_mode
+            self.set_camera_mode(mode_camera)
         elif commande == 'N':
             help_line = 10
             self.restart()
@@ -448,11 +467,13 @@ class MastermindCV:
 
         self.frame_position = help_lignes_width
 
+        # print(f"build_image> w={self.width} h={self.height}")
+
         # taille totale
-        self.full_width = help_lignes_width + self.ocr.width + self.padding
+        self.full_width = help_lignes_width + self.width + self.padding
 
         self.padding_title = self.padding + self.title_height + self.padding
-        self.full_height = self.padding_title + self.ocr.height
+        self.full_height = self.padding_title + self.height
         if (self.padding_title + help_lignes_height) > self.full_height: self.full_height = self.padding_title + help_lignes_height
         self.full_height += 2*self.padding
 
@@ -600,7 +621,9 @@ class MastermindCV:
             x1 = self.frame_position
             y1 = self.padding_title
 
-            self.image[y1:y1 + self.ocr.height, x1:x1 + self.ocr.width] = self.frame
+            # print(self.frame.shape)
+
+            self.image[y1:y1 + self.height, x1:x1 + self.width] = self.frame
 
             if self.chiffre == 0:
                 text = "aucune detection"
@@ -673,7 +696,7 @@ class MastermindCV:
             except ValueError:
                 return False
 
-        result, self.frame = self.ocr.read()
+        result, self.frame = self.read()
         jeu = self.jeu_courant()
 
         self.draw_ihm(jeu.position)
@@ -714,6 +737,20 @@ class MastermindCV:
                 break
 
         self.draw_ihm(jeu.position)
+
+        # Mise à jour de la coulur nopixel
+        if self.chiffre > 0:
+            if self.proba > 0.8:
+                self.color = b'GREEN'
+                # self.s.sendto(b'GREEN', self.addr_port)
+            else:
+                self.color = b'BLUE'
+                # self.s.sendto(b'BLUE', self.addr_port)
+        else:
+            self.color = b'RED'
+            # self.s.sendto(b'RED', self.addr_port)
+
+        # print(f"process_frame> {self.color}")
 
     def run(self):
         while True:
