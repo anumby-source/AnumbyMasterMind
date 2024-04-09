@@ -36,7 +36,7 @@ class OCR:
     """
 
     def __init__(self):
-        self.reader = easyocr.Reader(['fr'])  # Utiliser EasyOCR avec la langue anglaise
+        self.reader = easyocr.Reader(['fr'],  model_storage_directory="./models")
         self.count = 0
         self.set_camera_mode(mode_camera)
 
@@ -86,12 +86,6 @@ class OCR:
             self.s.sendto(self.color, self.addr_port)
             return None
 
-        """
-        r = requests.get("http://192.168.4.1:80/capture")
-        image = np.asarray(bytearray(r.content), dtype=np.uint8)
-        return cv2.imdecode(image, cv2.IMREAD_COLOR)
-        """
-
     def read(self):
         if mode_camera == internal_mode:
             frame = self.internal_camera()
@@ -122,7 +116,6 @@ class Jeu:
 class MastermindCV(OCR):
     def __init__(self):
         super().__init__()
-        # self.ocr = OCR()
         self.frame = None
 
         # Créer une fenêtre OpenCV
