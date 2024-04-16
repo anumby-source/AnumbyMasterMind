@@ -122,6 +122,13 @@ class MastermindCV(OCR):
         cv2.namedWindow('ANUMBY - MasterMind')
         cv2.setMouseCallback('ANUMBY - MasterMind', self.mouse)
 
+        (self.wfont, self.hfont), self.baseline = cv2.getTextSize("1",
+                                                                  fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+                                                                  fontScale=1,
+                                                                  thickness=1)
+
+        # print(f"MastermindCV> wf={self.wfont}, hf={self.hfont}, base={self.baseline}")
+
         # Définir les valeurs possibles
         self.valeurs = [i for i in range(1, N + 1)]
         self.info_start = "Choisis une position"
@@ -150,8 +157,8 @@ class MastermindCV(OCR):
             "Q : quit",
         ]
 
-        self.position_width = 70
-        self.position_height = 50
+        self.position_width = 40
+        self.position_height = 32
 
         self.help_width = 180
 
@@ -215,16 +222,16 @@ class MastermindCV(OCR):
         if difficulty == 'F':
             N = 3
             P = 2
-            max_lignes = P * 2
+            max_lignes = N * 2
         elif difficulty == 'D':
-            N = 6
+            N = 5
             P = 3
-            max_lignes = P * 2
+            max_lignes = N * 2
             self.restart()
         elif difficulty == 'T':
             N = 6
             P = 6
-            max_lignes = P * 2
+            max_lignes = N * 2
             self.restart()
         self.restart()
 
@@ -273,7 +280,7 @@ class MastermindCV(OCR):
         elif commande == 'Z':
             # enter => valider une combinaison
             help_line = 1
-            zone = 4
+            zone = 10
 
         self.draw_help_line(help_line)
         jeu = self.jeu_courant()
@@ -282,7 +289,7 @@ class MastermindCV(OCR):
             # print("zone=", zone)
             jeu.position = zone
             self.draw_ihm(zone)
-        elif zone == 4:
+        elif zone == 10:
             # on teste la combinaison
             ok = self.result()
             if not ok:
@@ -308,8 +315,11 @@ class MastermindCV(OCR):
         # pour détecter un click dans la zone des pavés
         p_left = self.padding + self.help_width + self.padding
         p_right = p_left + P*(self.position_width + self.padding)
-        p_top = self.padding + self.title_height + self.padding
-        p_bottom = h_top + self.position_height
+
+        p_top = h_top + (self.lignes - 1) * self.ligne_height
+        p_bottom = p_top + self.position_height
+
+        # print(f"mouse> y={y} p0={p0} top={p_top} bottom={p_bottom}")
 
         if event == cv2.EVENT_LBUTTONUP:
             if x > h_left and x < h_right and y > h_top and y < h_bottom:
@@ -547,23 +557,27 @@ class MastermindCV(OCR):
                 y2 = y1 + self.position_height
                 # Dessiner les zones sur l'image
                 # la couleur change pour la zone en cours
-                color_fond = green
+                color_fond = yellow
                 color_char = red
                 if ligne == (self.lignes - 1):
                     jeu.set_time()
                     if position == current_position:
-                        color_fond = red
-                        color_char = white
+                        color_fond = cyan
+                        color_char = red
 
                 # print("draw_ihm. i=", i, x1, y1, x2, y2)
                 cv2.rectangle(self.image, (x1, y1), (x2, y2), color_fond, -1)
 
+                text = labels[position]
+                htext = self.position_height * 0.25
+                fontScale = htext / self.hfont
+
                 cv2.putText(self.image,
-                            text=labels[position],
-                            org=(x1 + 10, y1 + int(self.position_height * 0.3)),
+                            text=text,
+                            org=(x1 + 3, y1 + int(self.position_height * 0.4)),
                             fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                            fontScale=0.6,
-                            color=white,
+                            fontScale=fontScale,
+                            color=red,
                             thickness=2,
                             lineType=cv2.LINE_AA)
 
@@ -571,11 +585,15 @@ class MastermindCV(OCR):
 
                 # print("draw_ihm. position=", position, i, "jeu=", j)
                 if j > 0:
+                    text = f"{j}"
+                    htext = self.position_height/2
+                    fontScale = htext/self.hfont
+
                     cv2.putText(self.image,
-                                text=f"{j}",
-                                org=(x1 + 30, y1 + int(self.position_height * 0.8)),
+                                text=text,
+                                org=(x1 + 20, y1 + int(self.position_height * 0.8)),
                                 fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                                fontScale=1.8,
+                                fontScale=fontScale,
                                 color=color_char,
                                 thickness=2,
                                 lineType=cv2.LINE_AA)
@@ -593,11 +611,15 @@ class MastermindCV(OCR):
             minutes = int(now / 60)
             secondes = now % 60
             cv2.rectangle(self.image, (x1, y1), (x2, y2), c, -1)  # Carré 1 (bleu)
+
+            htext = self.info_height * 0.6
+            fontScale = htext / self.hfont
+
             cv2.putText(self.image,
                         text="(" + self.camera_tag + ") " + jeu.info + f" {minutes}m{secondes}s",
-                        org=(x1 + 10, y1 + 18),
+                        org=(x1 + 10, y1 + int(self.info_height*0.8)),
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=0.6,
+                        fontScale=fontScale,
                         color=red,
                         thickness=1,
                         lineType=cv2.LINE_AA)
