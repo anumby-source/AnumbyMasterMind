@@ -72,8 +72,7 @@ class OCR:
             # self.fd.write('     received {:6.3f}\r\n'.format(perf_counter() - self.t))
             # self.count += 1
             raw_img = np.asarray(bytearray(buf[0]), dtype=np.uint8)
-            frame = cv2.imdecode(raw_img, cv2.IMREAD_COLOR)
-            return frame
+            orig_frame = cv2.imdecode(raw_img, cv2.IMREAD_COLOR)
 
             # frame = cv2.imdecode(raw_img, cv2.IMREAD_COLOR)
             # self.fd.write('     decoded {:6.3f}\r\n'.format(perf_counter() - self.t))
@@ -82,9 +81,21 @@ class OCR:
             # print('image ', self.count)
             # return res, frame
         except:          # timeout de réception de l'image
+            orig_frame = np.zeros((image_w, image_h, 3), dtype=np.uint8)
+            orig_frame += 255
+
             # self.fd.write('     no image {:6.3f}\r\n'.format(perf_counter()-self.t))
             self.s.sendto(self.color, self.addr_port)
-            return None
+
+        scale_percent = 300  # percent of original size
+        self.width = int(orig_frame.shape[1] * scale_percent / 100)
+        self.height = int(orig_frame.shape[0] * scale_percent / 100)
+        dim = (self.width, self.height)
+
+        # resize image
+        frame = cv2.resize(orig_frame, dim, interpolation=cv2.INTER_AREA)
+
+        return frame
 
     def read(self):
         if mode_camera == internal_mode:
@@ -105,6 +116,7 @@ class Jeu:
 
     def __init__(self):
         self.info = Jeu.info_start
+        self.info_color = green
         self.jeu = [-1 for i in range(P)]
         self.position = -1
         self.t = time.time()
@@ -131,7 +143,6 @@ class MastermindCV(OCR):
 
         # Définir les valeurs possibles
         self.valeurs = [i for i in range(1, N + 1)]
-        self.info_start = "Choisis une position"
 
         self.proba = 0
         self.chiffre = 0
@@ -296,6 +307,7 @@ class MastermindCV(OCR):
                 old = self.jeu_courant()
                 if self.lignes >= max_lignes:
                     old.info = "Perdu! trop d'essais"
+                    old.info_color = red
                 else:
                     self.lignes += 1
                     self.jeux.append(Jeu())
@@ -395,10 +407,6 @@ class MastermindCV(OCR):
 
         self.valeurs = [i for i in range(1, N + 1)]
 
-        # initialise les lignes d'info
-        self.info = []
-        self.info.append(self.info_start)
-
         # initialise la combinaison secrète
         self.secret = random.sample(self.valeurs, P)
 
@@ -439,9 +447,11 @@ class MastermindCV(OCR):
         r = False
         if exact == P:
             jeu.info = f"Bravo c'est gagne!!!"
+            jeu.info_color = blue
             r = True
         else:
             jeu.info = f"OK={exact} on={exists} off={off}"
+            jeu.info_color = red
         # print("result", jeu.info)
 
         self.draw_ihm()
@@ -531,17 +541,20 @@ class MastermindCV(OCR):
         cv2.rectangle(self.image, (x1, y1), (x1 + self.secret_width, y1 + self.secret_height), magenta, -1)
 
         if self.show_secret:
+            htext = self.secret_height / 2
+            fontScale = htext / self.hfont
+
             cv2.putText(self.image,
                         text=f"secret={self.secret}",
-                        org=(x1 + 10, y1 + 18),
+                        org=(x1 + 10, y1 + int(self.secret_height * 0.8)),
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
-                        fontScale=0.6,
+                        fontScale=fontScale,
                         color=white,
                         thickness=1,
                         lineType=cv2.LINE_AA)
 
     def draw_lignes(self, current_position):
-        # print("draw_lignes. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
+        # print("draw_lignes. Position=", current_position, "lignes=", self.lignes)
         p_min = P
         if P < 4:
             p_min = 4
@@ -620,7 +633,7 @@ class MastermindCV(OCR):
                         org=(x1 + 10, y1 + int(self.info_height*0.8)),
                         fontFace=cv2.FONT_HERSHEY_SIMPLEX,
                         fontScale=fontScale,
-                        color=red,
+                        color=jeu.info_color,
                         thickness=1,
                         lineType=cv2.LINE_AA)
 
@@ -664,7 +677,7 @@ class MastermindCV(OCR):
 
     # Fonction pour dessiner l'IHM
     def draw_ihm(self, current_position=-1):
-        # print("draw_ihm. Position=", current_position, "lignes=", self.lignes, "info=", self.info)
+        # print("draw_ihm. Position=", current_position, "lignes=", self.lignes)
 
         """
              ---
@@ -718,16 +731,20 @@ class MastermindCV(OCR):
 
         if self.lignes >= max_lignes:
             jeu.info = "Perdu! trop d'essais"
+            jeu.info_color = red
             self.draw_ihm(jeu.position)
             return
 
         if jeu.position == -1:
             jeu.info = f"choisis une position"
+            jeu.info_color = blue
         else:
             jeu.info = f"choisis un chiffre (1..{N})"
+            jeu.info_color = blue
 
         if result is None:
             jeu.info = f"pas d'image"
+            jeu.info_color = red
             self.draw_ihm(jeu.position)
             return
 
@@ -744,11 +761,13 @@ class MastermindCV(OCR):
                             jeu.jeu[jeu.position] = t
                             # print("process_frame. position=", self.position, "jeu=", jeu)
                             jeu.info = f"chiffre {t} choisi"
+                            jeu.info_color = blue
                             self.proba = prob
                             self.chiffre = t
                             self.box = bbox
                         else:
                             jeu.info = f"doublons interdits ({t})"
+                            jeu.info_color = red
                 break
 
         self.draw_ihm(jeu.position)
